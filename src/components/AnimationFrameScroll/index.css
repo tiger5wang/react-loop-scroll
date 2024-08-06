@@ -1,0 +1,24 @@
+.custom-list {
+  white-space: nowrap;
+  font-size: 14px;
+  overflow: hidden;
+  height: 100%;
+}
+
+.list-body {
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+.list-body-scroll {
+  overflow: auto;
+}
+
+.list-body-horizontal {
+  display: inline-block;
+
+  div {
+    display: inline-block;
+  }
+}
