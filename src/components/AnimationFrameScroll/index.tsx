@@ -1,6 +1,23 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { memo, useRef, useEffect } from 'react'
 import classNames from 'classnames'
 import './index.css'
+
+// 防抖
+export const debounce = (fn: (...args: any[]) => void, delay: number = 200) => {
+  let timer: number | null = null
+  // 闭包
+  return (...args: any[]) => {
+    // 判断还在定时，说明当前正在一个计时过程中，并且又触发了相同事件。所以要取消当前的计时，重新开始计时
+    if (timer) {
+      clearTimeout(timer)
+    }
+    timer = setTimeout(() => {
+      timer = null
+      return fn(...args)
+    }, delay)
+  }
+}
 
 interface AnimationFrameScrollProps {
   steep?: number //滚动速度，默认是1
@@ -44,11 +61,14 @@ const AnimationFrameScroll: React.FC<
   const scrollBody = useRef<HTMLDivElement>(null)
   const listBody = useRef<HTMLDivElement>(null)
   const listBody2 = useRef<HTMLDivElement>(null)
-
+  // 是否横向滚动
   const isHorizontal = scrollDirection === 'left' || scrollDirection === 'right'
   const st =
     scrollDirection === 'top' || scrollDirection === 'left' ? steep : -steep
 
+  /**
+   * 停止requestAnimationFrame
+   */
   const clearAnimation = () => {
     if (animationFrame.current) {
       cancelAnimationFrame(animationFrame.current)
@@ -64,7 +84,7 @@ const AnimationFrameScroll: React.FC<
   const initScrollDistance = (listSize: number, bodySize: number) => {
     const tempScrollDistance = Math.abs(scrollDistance.current)
     if (scrollDistance.current < 0) {
-      if (tempScrollDistance > maxScrollDistance.current) {
+      if (tempScrollDistance >= maxScrollDistance.current) {
         scrollDistance.current = -(listSize - bodySize)
       }
     } else {
@@ -76,9 +96,6 @@ const AnimationFrameScroll: React.FC<
    * requestAnimationFrame计算移动距离
    */
   const run = () => {
-    if (!listBody.current || !listBody2.current || !scrollBody.current) return
-    clearAnimation()
-
     isHorizontal
       ? initScrollDistance(listWidth.current, bodyWidth.current)
       : initScrollDistance(listHeight.current, bodyHeight.current)
@@ -87,8 +104,9 @@ const AnimationFrameScroll: React.FC<
     const style = isHorizontal
       ? `translate(${scrollDistance.current}px, 0px)`
       : `translate(0px, ${scrollDistance.current}px)`
-    listBody.current.style.transform = style
-    listBody2.current.style.transform = style
+
+    listBody.current!.style.transform = style
+    listBody2.current!.style.transform = style
 
     animationFrame.current = window.requestAnimationFrame(run)
   }
@@ -100,29 +118,30 @@ const AnimationFrameScroll: React.FC<
     console.log('-------initData--------')
     if (scrollBody.current && listBody.current && listBody2.current) {
       scrollDistance.current = 0
-      bodyHeight.current = scrollBody.current?.clientHeight
-      bodyWidth.current = scrollBody.current?.clientWidth
-      listHeight.current = listBody.current?.clientHeight
-      listWidth.current = listBody.current?.clientWidth
+      bodyHeight.current = scrollBody.current.clientHeight
+      bodyWidth.current = scrollBody.current.clientWidth
+      listHeight.current = listBody.current.clientHeight
+      listWidth.current = listBody.current.clientWidth
+
+      // 赋值最大滚动距离
       maxScrollDistance.current = isHorizontal
         ? 2 * listWidth.current - bodyWidth.current
         : 2 * listHeight.current - bodyHeight.current
 
       if (
-        (bodyHeight.current !== 0 &&
-          listHeight.current !== 0 &&
-          listHeight.current > bodyHeight.current) ||
-        (bodyWidth.current !== 0 &&
-          listWidth.current !== 0 &&
-          listWidth.current > bodyWidth.current)
+        listHeight.current > bodyHeight.current ||
+        listWidth.current > bodyWidth.current
       ) {
+        // 需要滚动的情况
         isCanScroll.current = true
         listBody2.current.className = listBody.current.className
         listBody2.current.innerHTML = listBody.current.innerHTML
         start()
       } else {
+        // 不需要滚动的情况
         isCanScroll.current = false
         listBody2.current.innerHTML = ''
+        listBody2.current.className = ''
         listBody.current.style.transform = `translate(0px, 0px)`
         stop()
       }
@@ -133,20 +152,8 @@ const AnimationFrameScroll: React.FC<
    * 开始滚动
    */
   const start = () => {
-    //判断是否可以滚动函数
-    const isScrollFunc = (bodySize: number, listSize: number) => {
-      if (bodySize > listSize || steep == 0) {
-        scrollDistance.current = 0
-        isCanScroll.current = false
-      }
-    }
-
     isStop.current = false
-    //判断是否可以滚动
-    isHorizontal
-      ? isScrollFunc(bodyWidth.current, listWidth.current)
-      : isScrollFunc(bodyHeight.current, listHeight.current)
-
+    clearAnimation()
     isCanScroll.current && run()
   }
 
@@ -185,10 +192,11 @@ const AnimationFrameScroll: React.FC<
     } else {
       scrollDistance.current += rollerScrollDistance
     }
+    clearAnimation()
     run()
   }
 
-  const resizeObserver = new ResizeObserver(initData)
+  const resizeObserver = new ResizeObserver(debounce(initData, 300))
 
   useEffect(() => {
     if (scrollBody.current) {
@@ -196,16 +204,13 @@ const AnimationFrameScroll: React.FC<
     }
     return () => {
       resizeObserver.disconnect()
+      clearAnimation()
     }
-  }, [scrollBody])
-
-  useEffect(() => {
-    initData()
-  }, [scrollBody, listBody, listBody2, scrollDirection])
+  }, [scrollBody, scrollDirection])
 
   return (
     <div
-      className={classNames(className, 'custom-list')}
+      className={classNames('custom-list', className)}
       ref={scrollBody}
       onMouseEnter={onMouseenter}
       onMouseLeave={onMouseleave}

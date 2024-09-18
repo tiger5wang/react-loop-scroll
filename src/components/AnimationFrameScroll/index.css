@@ -18,7 +18,7 @@
 .list-body-horizontal {
   display: inline-block;
 
-  div {
+  > div {
     display: inline-block;
   }
 }
